@@ -10,6 +10,7 @@ export class PlacesController {
      */
     @Get('nearby')
     async getNearby(
+        //http://localhost:3000/places/nearby?latitude=51.5074&longitude=-0.1278&radius=5000
         @Query('latitude') latitude: string,
         @Query('longitude') longitude: string,
         @Query('radius') radius?: string,
