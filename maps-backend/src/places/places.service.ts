@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { PaginationDto } from './dto/pagination.dto';
+import { NearbyDto } from './dto/nearby.dto';
 @Injectable()
 export class PlacesService {
     constructor(private prisma: PrismaService) { }
@@ -71,5 +72,26 @@ export class PlacesService {
             where: { id },
             data: updatePlaceDto,
         });
+    }
+    async findNearby(nearbyDto: NearbyDto) {
+        const { lat, lng, radius } = nearbyDto;
+
+        return this.prisma.$queryRawUnsafe(`
+    SELECT * FROM (
+      SELECT *,
+        (
+          6371 * acos(
+            cos(radians(${lat})) *
+            cos(radians(latitude)) *
+            cos(radians(longitude) - radians(${lng})) +
+            sin(radians(${lat})) *
+            sin(radians(latitude))
+          )
+        ) AS distance
+      FROM "Place"
+    ) AS sub
+    WHERE distance < ${radius}
+    ORDER BY distance ASC;
+  `);
     }
 }
