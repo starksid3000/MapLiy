@@ -1,97 +1,91 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePlaceDto } from './dto/create-place.dto';
-import { UpdatePlaceDto } from './dto/update-place.dto';
-import { PaginationDto } from './dto/pagination.dto';
-import { NearbyDto } from './dto/nearby.dto';
+
+export interface NearbyPlace {
+    id: string;
+    name: string;
+    distance: number;
+}
+
 @Injectable()
 export class PlacesService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private readonly prisma: PrismaService) { }
 
-    create(createPlaceDto: CreatePlaceDto) {
-        return this.prisma.place.create({
-            data: createPlaceDto,
-        });
+    /**
+     * Create a place with latitude and longitude
+     */
+    async createPlace(name: string, latitude: number, longitude: number) {
+        await this.prisma.$executeRaw`
+      INSERT INTO "Place"(id, name, location, "createdAt")
+      VALUES (
+        gen_random_uuid(),
+        ${name},
+        ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326),
+        NOW()
+      )
+    `;
+        return { success: true };
     }
 
-    async findAll(paginationDto: PaginationDto) {
-        const { page, limit } = paginationDto;
-
-        const skip = (page - 1) * limit;
-
-        const [data, total] = await Promise.all([
-            this.prisma.place.findMany({
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-            }),
-            this.prisma.place.count(),
-        ]);
-
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                lastPage: Math.ceil(total / limit),
-            },
-        };
-    }
-    async findOne(id: number) {
-        const place = await this.prisma.place.findUnique({
-            where: { id }
-        })
-        if (!place) {
-            throw new NotFoundException(`Place with ID ${id} not found`);
-        }
-        return place;
-    }
-    async remove(id: number) {
-        const place = await this.prisma.place.delete({
-            where: { id },
-        });
-        if (!place) {
-            throw new NotFoundException(`Place with ID ${id} not found`);
-        }
-        return place;
-    }
-    async update(id: number, updatePlaceDto: UpdatePlaceDto) {
-        const place = await this.prisma.place.findUnique({
-            where: { id },
-        });
-
-        if (!place) {
-            throw new NotFoundException(`Place with id ${id} not found`);
-        }
-
-        if (Object.keys(updatePlaceDto).length === 0) {
-            throw new BadRequestException('No fields provided for update');
-        }
-
-        return this.prisma.place.update({
-            where: { id },
-            data: updatePlaceDto,
-        });
-    }
-    async findNearby(nearbyDto: NearbyDto) {
-        const { lat, lng, radius } = nearbyDto;
-
-        return this.prisma.$queryRawUnsafe(`
-    SELECT * FROM (
-      SELECT *,
-        (
-          6371 * acos(
-            cos(radians(${lat})) *
-            cos(radians(latitude)) *
-            cos(radians(longitude) - radians(${lng})) +
-            sin(radians(${lat})) *
-            sin(radians(latitude))
-          )
-        ) AS distance
+    /**
+     * Get all places (with lat/lng extracted)
+     */
+    async findAll() {
+        const places = await this.prisma.$queryRaw`
+      SELECT 
+        id,
+        name,
+        ST_X(location::geometry) AS longitude,
+        ST_Y(location::geometry) AS latitude,
+        "createdAt"
       FROM "Place"
-    ) AS sub
-    WHERE distance < ${radius}
-    ORDER BY distance ASC;
-  `);
+    `;
+        return places;
+    }
+
+    /**
+     * Find nearby places within a radius (meters)
+     */
+    async findNearbyPlaces(
+        latitude: number,
+        longitude: number,
+        radius = 5000,
+    ): Promise<NearbyPlace[]> {
+        const places = await this.prisma.$queryRaw<{
+            id: string;
+            name: string;
+            distance: string;
+        }[]>`
+      SELECT 
+        id,
+        name,
+        ST_Distance(
+          location,
+          ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
+        )::double precision AS distance
+      FROM "Place"
+      WHERE ST_DWithin(
+        location,
+        ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326),
+        ${radius}
+      )
+      ORDER BY distance
+    `;
+
+        // Convert distance to number
+        return places.map((p) => ({
+            id: p.id,
+            name: p.name,
+            distance: Number(p.distance),
+        }));
+    }
+    async deletePlace(id: string) {
+        const result = await this.prisma.$executeRaw`
+      DELETE FROM "Place" WHERE id = ${id}
+    `;
+        if (result === 0) {
+            throw new NotFoundException(`Place with ID ${id} not found`);
+        }
+        return { success: true };
     }
 }

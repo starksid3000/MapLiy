@@ -7,9 +7,8 @@ datasource db {
 }
 
 model Place {
-  id        Int      @id @default(autoincrement())
+  id        String                                @id @default(uuid())
   name      String
-  latitude  Float
-  longitude Float
-  createdAt DateTime @default(now())
+  location  Unsupported("geography(Point, 4326)")
+  createdAt DateTime                              @default(now())
 }
