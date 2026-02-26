@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
-
+import { PaginationDto } from './dto/pagination.dto';
 @Injectable()
 export class PlacesService {
     constructor(private prisma: PrismaService) { }
@@ -13,10 +13,28 @@ export class PlacesService {
         });
     }
 
-    findAll() {
-        return this.prisma.place.findMany({
-            orderBy: { createdAt: 'desc' },
-        });
+    async findAll(paginationDto: PaginationDto) {
+        const { page, limit } = paginationDto;
+
+        const skip = (page - 1) * limit;
+
+        const [data, total] = await Promise.all([
+            this.prisma.place.findMany({
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prisma.place.count(),
+        ]);
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                lastPage: Math.ceil(total / limit),
+            },
+        };
     }
     async findOne(id: number) {
         const place = await this.prisma.place.findUnique({
