@@ -1,18 +1,26 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Param, ParseIntPipe } from '@nestjs/common';
 import { PlacesService } from './places.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 
 @Controller('places')
 export class PlacesController {
-  constructor(private readonly placesService: PlacesService) {}
+    constructor(private readonly placesService: PlacesService) { }
 
-  @Post()
-  create(@Body() createPlaceDto: CreatePlaceDto) {
-    return this.placesService.create(createPlaceDto);
-  }
+    @Post()
+    create(@Body() createPlaceDto: CreatePlaceDto) {
+        return this.placesService.create(createPlaceDto);
+    }
 
-  @Get()
-  findAll() {
-    return this.placesService.findAll();
-  }
+    @Get()
+    findAll() {
+        return this.placesService.findAll();
+    }
+    @Delete(':id')
+    remove(@Param('id',ParseIntPipe) id: string) {
+        return this.placesService.remove(+id);
+    }
+    @Get(':id')
+    findOne(@Param('id',ParseIntPipe) id: string) {
+        return this.placesService.findOne(+id);
+    }
 }
