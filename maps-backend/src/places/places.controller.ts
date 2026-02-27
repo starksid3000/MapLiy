@@ -25,9 +25,23 @@ export class PlacesController {
     /**
      * GET /places/all
      */
-    @Get('all')
-    async getAllPlaces() {
-        return this.placesService.findAll();
+    @Get('viewport')
+    async getViewportPlaces(
+        @Query('swLat') swLat: string,
+        @Query('swLng') swLng: string,
+        @Query('neLat') neLat: string,
+        @Query('neLng') neLng: string,
+        @Query('userLat') userLat: string,
+        @Query('userLng') userLng: string,
+    ) {
+        return this.placesService.findPlacesInViewport(
+            parseFloat(swLat),
+            parseFloat(swLng),
+            parseFloat(neLat),
+            parseFloat(neLng),
+            parseFloat(userLat),
+            parseFloat(userLng),
+        );
     }
 
     /**
