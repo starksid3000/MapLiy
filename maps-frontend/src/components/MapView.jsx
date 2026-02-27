@@ -1,6 +1,6 @@
 // src/MapView.jsx
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvent } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvent, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
@@ -28,11 +28,19 @@ const hoverIcon = new L.Icon({
   iconAnchor: [17, 56],
 });
 
-// Track map movement
-function MapBoundsUpdater({ onBoundsChange }) {
+// Sets initial bounds on mount AND tracks map movement
+function MapBoundsInitializer({ onBoundsChange }) {
+  const map = useMap();
+
+  useEffect(() => {
+    // Fire immediately with the initial bounds
+    onBoundsChange(map.getBounds());
+  }, [map, onBoundsChange]);
+
   useMapEvent('moveend', (e) => {
     onBoundsChange(e.target.getBounds());
   });
+
   return null;
 }
 
@@ -94,14 +102,13 @@ export default function MapView() {
       center={[userLocation.lat, userLocation.lng]}
       zoom={13}
       style={{ height: '100vh', width: '100%' }}
-      whenCreated={(map) => setBounds(map.getBounds())}
     >
       <TileLayer
         attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      <MapBoundsUpdater onBoundsChange={setBounds} />
+      <MapBoundsInitializer onBoundsChange={setBounds} />
 
       {/* User marker */}
       <Marker position={[userLocation.lat, userLocation.lng]}>
